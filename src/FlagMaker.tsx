@@ -837,83 +837,229 @@ export default function FlagMaker() {
   };
 
   const SelectedControls = () => {
-    const item = overlays.find((o) => o.id === selectedId);
-    if (!item) return null;
-    return (
-      <div className="mt-4 rounded-xl border p-4 bg-white shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="text-sm font-medium">Overlay settings</div>
-          <div className="flex gap-2">
-            <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => sendBackward(item.id)} title="Send backward">⬇︎</button>
-            <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => bringForward(item.id)} title="Bring forward">⬆︎</button>
-            <button className="px-2 py-1 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50" onClick={() => removeOverlay(item.id)} title="Delete">🗑</button>
-          </div>
-        </div>
+  const item = overlays.find((o) => o.id === selectedId);
+  if (!item) return null;
 
-        {(item.type === "custom" || item.type === "symbol") && (
-          <div className="mt-3">
-            <label className="block text-sm mb-1">SVG Path (d)</label>
-            <textarea
-              className="w-full border rounded p-2 font-mono h-24"
-              value={item.path || ""}
-              onChange={(e) => updateOverlay(item.id, { path: e.target.value })}
-              placeholder="Paste an SVG path 'd' here"
-            />
-            <p className="text-xs text-neutral-500 mt-1">Paths use a 100×100 box and are auto‑scaled.</p>
-          </div>
-        )}
+  // tiny helpers
+  const num = (v: any) => Number.isFinite(+v) ? +v : 0;
+  const clampNum = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
 
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="block text-sm mb-1">Fill</label>
-            <input type="color" className="h-9 w-full" value={item.fill} onChange={(e) => updateOverlay(item.id, { fill: e.target.value })} />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Stroke</label>
-            <input type="color" className="h-9 w-full" value={item.stroke} onChange={(e) => updateOverlay(item.id, { stroke: e.target.value })} />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="block text-sm mb-1">Stroke width</label>
-            <input type="range" min={0} max={40} step={1} value={item.strokeWidth} onChange={(e) => updateOverlay(item.id, { strokeWidth: Number(e.target.value) })} className="w-full" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Opacity</label>
-            <input type="range" min={0} max={100} step={1} value={Math.round(item.opacity * 100)} onChange={(e) => updateOverlay(item.id, { opacity: Number(e.target.value) / 100 })} className="w-full" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="block text-sm mb-1">Width (%)</label>
-            <input type="range" min={2} max={100} step={1} value={item.w} onChange={(e) => updateOverlay(item.id, { w: Number(e.target.value) })} className="w-full" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Height (%)</label>
-            <input type="range" min={2} max={100} step={1} value={item.h} onChange={(e) => updateOverlay(item.id, { h: Number(e.target.value) })} className="w-full" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-3 mt-3">
-          <div>
-            <label className="block text-sm mb-1">X (%)</label>
-            <input type="range" min={0} max={100} step={1} value={item.x} onChange={(e) => updateOverlay(item.id, { x: Number(e.target.value) })} className="w-full" />
-          </div>
-          <div>
-            <label className="block text-sm mb-1">Y (%)</label>
-            <input type="range" min={0} max={100} step={1} value={item.y} onChange={(e) => updateOverlay(item.id, { y: Number(e.target.value) })} className="w-full" />
-          </div>
-        </div>
-
-        <div className="mt-3">
-          <label className="block text-sm mb-1">Rotation (°)</label>
-          <input type="range" min={-180} max={180} step={1} value={item.rotation} onChange={(e) => updateOverlay(item.id, { rotation: Number(e.target.value) })} className="w-full" />
+  return (
+    <div className="mt-4 rounded-xl border p-4 bg-white shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="text-sm font-medium">Overlay settings</div>
+        <div className="flex gap-2">
+          <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => sendBackward(item.id)} title="Send backward">⬇︎</button>
+          <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => bringForward(item.id)} title="Bring forward">⬆︎</button>
+          <button className="px-2 py-1 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50" onClick={() => removeOverlay(item.id)} title="Delete">🗑</button>
         </div>
       </div>
-    );
-  };
+
+      {(item.type === "custom" || item.type === "symbol") && (
+        <div className="mt-3">
+          <label className="block text-sm mb-1">SVG Path (d)</label>
+          <textarea
+            className="w-full border rounded p-2 font-mono h-24"
+            value={item.path || ""}
+            onChange={(e) => updateOverlay(item.id, { path: e.target.value })}
+            placeholder="Paste an SVG path 'd' here"
+          />
+          <p className="text-xs text-neutral-500 mt-1">Paths use a 100×100 box and are auto‑scaled.</p>
+        </div>
+      )}
+
+      {/* Colors */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className="block text-sm mb-1">Fill</label>
+          <input type="color" className="h-9 w-full" value={item.fill} onChange={(e) => updateOverlay(item.id, { fill: e.target.value })} />
+        </div>
+        <div>
+          <label className="block text-sm mb-1">Stroke</label>
+          <input type="color" className="h-9 w-full" value={item.stroke} onChange={(e) => updateOverlay(item.id, { stroke: e.target.value })} />
+        </div>
+      </div>
+
+      {/* Stroke width & Opacity */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className="block text-sm mb-1">Stroke width (px)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={40}
+              step={1}
+              value={item.strokeWidth}
+              onChange={(e) => updateOverlay(item.id, { strokeWidth: num(e.target.value) })}
+              className="w-full"
+            />
+            <input
+              type="number"
+              className="w-20 border rounded px-2 py-1"
+              min={0}
+              max={40}
+              step={1}
+              value={item.strokeWidth}
+              onChange={(e) => updateOverlay(item.id, { strokeWidth: clampNum(num(e.target.value), 0, 40) })}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">Opacity (%)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(item.opacity * 100)}
+              onChange={(e) => updateOverlay(item.id, { opacity: num(e.target.value) / 100 })}
+              className="w-full"
+            />
+            <input
+              type="number"
+              className="w-20 border rounded px-2 py-1"
+              min={0}
+              max={100}
+              step={1}
+              value={Math.round(item.opacity * 100)}
+              onChange={(e) => updateOverlay(item.id, { opacity: clampNum(num(e.target.value), 0, 100) / 100 })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Size */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className="block text-sm mb-1">Width (%)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={2}
+              max={100}
+              step={1}
+              value={item.w}
+              onChange={(e) => updateOverlay(item.id, { w: num(e.target.value) })}
+              className="w-full"
+            />
+            <input
+              type="number"
+              className="w-20 border rounded px-2 py-1"
+              min={2}
+              max={100}
+              step={1}
+              value={item.w}
+              onChange={(e) => updateOverlay(item.id, { w: clampNum(num(e.target.value), 2, 100) })}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">Height (%)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={2}
+              max={100}
+              step={1}
+              value={item.h}
+              onChange={(e) => updateOverlay(item.id, { h: num(e.target.value) })}
+              className="w-full"
+            />
+            <input
+              type="number"
+              className="w-20 border rounded px-2 py-1"
+              min={2}
+              max={100}
+              step={1}
+              value={item.h}
+              onChange={(e) => updateOverlay(item.id, { h: clampNum(num(e.target.value), 2, 100) })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Position */}
+      <div className="grid grid-cols-2 gap-3 mt-3">
+        <div>
+          <label className="block text-sm mb-1">X (%)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={item.x}
+              onChange={(e) => updateOverlay(item.id, { x: num(e.target.value) })}
+              className="w-full"
+            />
+            <input
+              type="number"
+              className="w-20 border rounded px-2 py-1"
+              min={0}
+              max={100}
+              step={1}
+              value={item.x}
+              onChange={(e) => updateOverlay(item.id, { x: clampNum(num(e.target.value), 0, 100) })}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm mb-1">Y (%)</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={1}
+              value={item.y}
+              onChange={(e) => updateOverlay(item.id, { y: num(e.target.value) })}
+              className="w-full"
+            />
+            <input
+              type="number"
+              className="w-20 border rounded px-2 py-1"
+              min={0}
+              max={100}
+              step={1}
+              value={item.y}
+              onChange={(e) => updateOverlay(item.id, { y: clampNum(num(e.target.value), 0, 100) })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Rotation */}
+      <div className="mt-3">
+        <label className="block text-sm mb-1">Rotation (°)</label>
+        <div className="flex items-center gap-2">
+          <input
+            type="range"
+            min={-180}
+            max={180}
+            step={1}
+            value={item.rotation}
+            onChange={(e) => updateOverlay(item.id, { rotation: num(e.target.value) })}
+            className="w-full"
+          />
+          <input
+            type="number"
+            className="w-24 border rounded px-2 py-1"
+            min={-180}
+            max={180}
+            step={1}
+            value={item.rotation}
+            onChange={(e) => updateOverlay(item.id, { rotation: clampNum(num(e.target.value), -180, 180) })}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
 
   const addPreset = (type: OverlayType) => () => addOverlay(type);
 
