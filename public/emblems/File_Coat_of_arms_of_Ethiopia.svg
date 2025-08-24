@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="600"
+   height="600"
+   version="1.1"
+   id="svg2"
+   sodipodi:docname="Emblem_of_Ethiopia.svg"
+   inkscape:version="1.3 (0e150ed6c4, 2023-07-21)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="namedview2"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.352459"
+     inkscape:cx="299.45455"
+     inkscape:cy="299.82424"
+     inkscape:window-width="1920"
+     inkscape:window-height="1007"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <circle
+     cx="300"
+     cy="300"
+     r="300"
+     fill="#0f47af"
+     id="circle1" />
+  <path
+     fill="#fcdd09"
+     d="M 71.746892,225.36874 H 246.11757 L 285.5414,104.02942 296.05735,136.39047 238.7616,312.72168 221.74968,300.36041 239.6176,245.36865 H 99.27437 L 71.746892,225.36874 M 158.9313,493.69421 212.81372,327.86028 109.59765,252.86862 h 34.02571 l 149.998,108.97818 -17.01592,12.35994 -46.7758,-33.98385 -43.37047,133.47141 -27.52787,19.99991 m 282.1374,0 -141.06737,-102.49154 -103.21954,74.99166 10.51462,-32.35986 149.99666,-108.97817 6.49998,19.99857 -46.7798,33.98785 113.5395,82.49163 10.51595,32.35986 M 528.25231,225.36874 387.18494,327.86028 426.60876,449.20241 399.08089,429.2025 341.78914,252.86862 h 21.02791 l 17.86792,54.99175 113.53949,-82.49163 h 34.02785 M 300.00133,59.533882 353.88109,225.36874 h 127.58343 l -27.52388,19.99991 H 268.53347 l 6.49597,-19.99991 h 57.82374 L 289.48538,91.894004 Z"
+     id="path1" />
+  <path
+     fill="none"
+     stroke="#fcdd09"
+     stroke-width="10"
+     d="M 300.00133,410.46658 V 540.466 M 195.38447,334.45625 71.747158,374.63074 M 235.34562,211.47413 158.93263,106.30181 M 364.65704,211.47413 441.0687,106.30181 m -36.45184,228.15444 123.63545,40.17449 z"
+     id="path2" />
+</svg>
