@@ -1,4 +1,8 @@
+# dependencies
 node_modules/
 dist/
+.vite/
+.venv/
+.vscode/
 .DS_Store
 .env
