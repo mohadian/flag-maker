@@ -148,6 +148,22 @@ function rectOverlay({ xPct, yPct, wPct, hPct, fill, stroke = "#0000", strokeWid
   };
 }
 
+// Build a custom polygon overlay inside a 100×100 box (auto‑scaled by w/h)
+function polyOverlay(points: Array<[number, number]>, fill: string): Overlay {
+  const d = `M ${points.map(([x, y]) => `${x} ${y}`).join(" L ")} Z`;
+  return {
+    id: uid(),
+    type: "custom",
+    x: 50, y: 50, w: 100, h: 100,
+    rotation: 0,
+    fill,
+    stroke: "#0000",
+    strokeWidth: 0,
+    opacity: 1,
+    path: d,
+  };
+}
+
 function starOverlay({ xPct, yPct, sizePct, fill, stroke = "#0000", strokeWidth = 0, opacity = 1 }: {
   xPct: number, yPct: number, sizePct: number,
   fill: string, stroke?: string, strokeWidth?: number, opacity?: number
@@ -160,8 +176,8 @@ function starOverlay({ xPct, yPct, sizePct, fill, stroke = "#0000", strokeWidth 
   };
 }
 
-// Make a rotated "band" (rectangle) between two points (in % of width/height).
-// `thicknessPct` is % of flag HEIGHT. Rotation is computed with the true 2:3 ratio.
+// A rotated band (rectangle) from point A → B. Thickness is % of flag HEIGHT.
+// Rotation respects the current ratio so angles look correct.
 function makeBandSegment(
   x1Pct: number, y1Pct: number,
   x2Pct: number, y2Pct: number,
@@ -169,11 +185,11 @@ function makeBandSegment(
   fill: string,
   ratio: [number, number]
 ): Overlay {
-  const [h, w] = ratio;               // e.g. [2,3]
-  const hw = h / w;                   // H/W
-  const dx = x2Pct - x1Pct;           // % of width
-  const dy = y2Pct - y1Pct;           // % of height
-  const lengthPct = Math.sqrt(dx*dx + (dy*hw)*(dy*hw)); // length as % of width
+  const [rh, rw] = ratio;     // e.g. [2,3]
+  const hw = rh / rw;         // height/width ratio for angle compensation
+  const dx = x2Pct - x1Pct;
+  const dy = y2Pct - y1Pct;
+  const lengthPct = Math.sqrt(dx*dx + (dy*hw)*(dy*hw)); // as % of width
   const angle = Math.atan2(dy * hw, dx) * 180 / Math.PI;
   return {
     id: uid(),
@@ -188,6 +204,196 @@ function makeBandSegment(
     strokeWidth: 0,
     opacity: 1,
   };
+}
+
+// Simple collapsible container (animated)
+function Collapse({ open, children }: { open: boolean; children: React.ReactNode }) {
+  return (
+    <div
+      className={`transition-all duration-300 ease-in-out overflow-hidden ${open ? "opacity-100" : "opacity-0"}`}
+      style={{ maxHeight: open ? 2000 : 0 }} // bump up if your content is taller
+    >
+      {children}
+    </div>
+  );
+}
+
+// Reusable card panel with a toggle
+function Panel({
+  title,
+  open,
+  setOpen,
+  children,
+}: {
+  title: string;
+  open: boolean;
+  setOpen: (v: boolean | ((prev: boolean) => boolean)) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-xl border bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="text-lg font-semibold">{title}</div>
+        <button
+          className="text-sm px-2 py-1 rounded border hover:bg-neutral-50"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          aria-controls={`${title.replace(/\s+/g, "-").toLowerCase()}-panel`}
+        >
+          {open ? "Hide ▲" : "Show ▼"}
+        </button>
+      </div>
+      <Collapse open={open}>
+        <div id={`${title.replace(/\s+/g, "-").toLowerCase()}-panel`} className="mt-3">
+          {children}
+        </div>
+      </Collapse>
+    </div>
+  );
+}
+
+/* ============================
+   Division Templates (like Flagmaker Jr.)
+   ============================ */
+
+// PER PALE (vertical bicolor)
+function templatePerPale() {
+  const ratio: [number, number] = [2, 3];
+  const sections = 2;
+  const colors = ["#005BBB", "#FFD500"]; // blue / yellow
+  const weights = [1, 1];
+  return { ratio, sections, colors, overlays: [], weights };
+}
+
+// PER FESS (horizontal bicolor)
+function templatePerFess() {
+  const ratio: [number, number] = [2, 3];
+  const sections = 2;
+  const colors = ["#CE1126", "#FFFFFF"]; // red / white
+  const weights = [1, 1];
+  return { ratio, sections, colors, overlays: [], weights, orientation: "horizontal" as Orientation };
+}
+
+// TRICOLOR VERTICAL
+function templateTricolorVertical() {
+  const ratio: [number, number] = [2, 3];
+  const sections = 3;
+  const colors = ["#002395", "#FFFFFF", "#ED2939"]; // blue / white / red
+  const weights = [1, 1, 1];
+  return { ratio, sections, colors, overlays: [], weights, orientation: "vertical" as Orientation };
+}
+
+// TRICOLOR HORIZONTAL
+function templateTricolorHorizontal() {
+  const ratio: [number, number] = [2, 3];
+  const sections = 3;
+  const colors = ["#009246", "#FFFFFF", "#CE2B37"]; // green / white / red
+  const weights = [1, 1, 1];
+  return { ratio, sections, colors, overlays: [], weights, orientation: "horizontal" as Orientation };
+}
+
+// QUARTERED
+function templateQuartered() {
+  const ratio: [number, number] = [1, 2];
+  // Base single section; draw quarters as overlays so they remain draggable/editable
+  const sections = 1;
+  const colors = ["#00247D"]; // background blue under overlays
+  const overlays: Overlay[] = [
+    rectOverlay({ xPct: 25, yPct: 25, wPct: 50, hPct: 50, fill: "#CF142B" }), // TL red
+    rectOverlay({ xPct: 75, yPct: 25, wPct: 50, hPct: 50, fill: "#FFFFFF" }), // TR white
+    rectOverlay({ xPct: 25, yPct: 75, wPct: 50, hPct: 50, fill: "#FFFFFF" }), // BL white
+    rectOverlay({ xPct: 75, yPct: 75, wPct: 50, hPct: 50, fill: "#CF142B" }), // BR red
+  ];
+  return { ratio, sections, colors, overlays, orientation: "horizontal" as Orientation };
+}
+
+// PER BEND (diagonal from hoist-top to fly-bottom)
+function templatePerBend() {
+  const ratio: [number, number] = [2, 3];
+  const sections = 1;
+  const colors = ["#FFFFFF"]; // background
+  const overlays: Overlay[] = [
+    // top-left triangle
+    (() => {
+      const o = polyOverlay([[0,0],[50,50],[0,100]], "#0038A8"); // blue
+      return o;
+    })(),
+    // bottom-right triangle
+    (() => {
+      const o = polyOverlay([[100,0],[100,100],[50,50]], "#FCD116"); // gold
+      return o;
+    })(),
+  ];
+  return { ratio, sections, colors, overlays };
+}
+
+// PER BEND SINISTER (diagonal from hoist-bottom to fly-top)
+function templatePerBendSinister() {
+  const ratio: [number, number] = [2,3];
+  const sections = 1;
+  const colors = ["#FFFFFF"];
+  const overlays: Overlay[] = [
+    polyOverlay([[0,0],[100,0],[50,50]], "#CE1126"), // top triangle
+    polyOverlay([[50,50],[0,100],[100,100]], "#0038A8"), // bottom triangle
+  ];
+  return { ratio, sections, colors, overlays };
+}
+
+// PER SALTIRE (X split)
+function templatePerSaltire() {
+  const ratio: [number, number] = [2,3];
+  const sections = 1;
+  const colors = ["#FFFFFF"]; // base
+  const band = 18; // thickness % of height (tweakable in UI)
+  const overlays: Overlay[] = [
+    // two wide diagonal bands crossing
+    makeBandSegment(0,0, 100,100, band, "#0038A8", ratio),
+    makeBandSegment(0,100, 100,0, band, "#FCD116", ratio),
+  ];
+  return { ratio, sections, colors, overlays };
+}
+
+// PER CHEVRON (V from hoist)
+function templatePerChevron() {
+  const ratio: [number, number] = [2,3];
+  const sections = 1;
+  const colors = ["#FFFFFF"]; // base
+  // Build a chevron with two diagonals meeting at center-left
+  const band = 20;
+  const overlays: Overlay[] = [
+    makeBandSegment(0,50, 60,15, band, "#007A4D", ratio), // upper arm
+    makeBandSegment(0,50, 60,85, band, "#007A4D", ratio), // lower arm
+  ];
+  return { ratio, sections, colors, overlays };
+}
+
+// CENTERED CROSS (equal arms)
+function templateCenteredCross() {
+  const ratio: [number, number] = [2,3];
+  const sections = 1;
+  const colors = ["#00247D"]; // blue base
+  const t = 18; // bar thickness % of height
+  const overlays: Overlay[] = [
+    rectOverlay({ xPct: 50, yPct: 50, wPct: 100, hPct: t, fill: "#FFFFFF" }),
+    rectOverlay({ xPct: 50, yPct: 50, wPct: t,   hPct: 100, fill: "#FFFFFF" }),
+  ];
+  return { ratio, sections, colors, overlays };
+}
+
+// NORDIC CROSS (offset cross; like Iceland/Scandi)
+function templateNordicCross() {
+  const ratio: [number, number] = [18,25];
+  const sections = 1;
+  const colors = ["#003897"]; // base blue
+  const whiteT = 10; const redT = 6;
+  const vCenter = 28; const hCenter = 39;
+  const overlays: Overlay[] = [
+    rectOverlay({ xPct: vCenter, yPct: 50, wPct: whiteT, hPct: 100, fill: "#FFFFFF" }),
+    rectOverlay({ xPct: 50, yPct: hCenter, wPct: 100, hPct: whiteT, fill: "#FFFFFF" }),
+    rectOverlay({ xPct: vCenter, yPct: 50, wPct: redT,   hPct: 100, fill: "#D72828" }),
+    rectOverlay({ xPct: 50, yPct: hCenter, wPct: 100, hPct: redT,   fill: "#D72828" }),
+  ];
+  return { ratio, sections, colors, overlays };
 }
 
 /* ----- USA (13 stripes; canton; starfield) ----- */
@@ -398,7 +604,7 @@ export default function FlagMaker() {
   const [ratio, setRatio] = useState<[number, number]>([2, 3]);
   const [sections, setSections] = useState<number>(3);
   const [weights, setWeights] = useState<number[]>([1, 1, 1]);
-  const [colors, setColors] = useState<string[]>(["#ce1126", "#ffffff", "#000000"]);
+  const [colors, setColors] = useState<string[]>(["#009246", "#ffffff", "#CE2B37"]);
   const [showGuides, setShowGuides] = useState<boolean>(false);
   const [overlays, setOverlays] = useState<Overlay[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -422,6 +628,14 @@ export default function FlagMaker() {
   };
   const pushHistory = () => setHistory((h) => [...h, snapshot()]);
   const totalWeight = useMemo(() => weights.reduce((a, b) => a + b, 0), [weights]);
+
+  // Collapsible states
+  const [canvasOpen, setCanvasOpen] = useState(true);
+  const [divisionsOpen, setDivisionsOpen] = useState(true);   // Canvas Templates (Divisions)
+  const [templatesOpen, setTemplatesOpen] = useState(true);   // Templates
+  const [sectionsOpen, setSectionsOpen] = useState(true);     // Sections
+  const [overlaysOpen, setOverlaysOpen] = useState(true);     // Overlays
+  const [exportOpen, setExportOpen] = useState(true);         // Export
 
   // Keep arrays in sync with `sections`
   useEffect(() => {
@@ -707,8 +921,7 @@ export default function FlagMaker() {
     <div className="p-4 md:p-6 grid gap-4 md:gap-6 grid-cols-1 xl:grid-cols-3">
       {/* Left Panel */}
       <div className="space-y-4">
-        <div className="rounded-xl border bg-white p-4 shadow-sm">
-          <div className="text-lg font-semibold mb-3">Canvas</div>
+        <Panel title="Canvas" open={canvasOpen} setOpen={setCanvasOpen}>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-sm mb-1">Orientation</label>
@@ -755,98 +968,84 @@ export default function FlagMaker() {
               <button className="px-3 py-1.5 rounded border hover:bg-neutral-50" onClick={redo} title="Redo">↪︎ Redo</button>
             </div>
           </div>
-        </div>
+        </Panel>
 
-        <div className="rounded-xl border bg-white p-4 shadow-sm">
-          <div className="text-lg font-semibold mb-3">Sections</div>
-          <div className="space-y-3">
-            {Array.from({ length: sections }).map((_, i) => (
-              <div key={i} className="grid grid-cols-12 gap-3 items-center">
-                <div className="col-span-3">
-                  <label className="block text-xs mb-1">Color {i + 1}</label>
-                  <input type="color" className="h-9 w-full" value={colors[i]} onChange={(e) => { pushHistory(); setColors((c) => c.map((x, idx) => (idx === i ? e.target.value : x))); }} />
-                </div>
-                <div className="col-span-8">
-                  <label className="block text-xs mb-1">Weight</label>
-                  <input type="range" min={1} max={20} step={1} value={weights[i]} onChange={(e) => { pushHistory(); setWeights((w) => w.map((x, idx) => (idx === i ? Number(e.target.value) : x))); }} className="w-full" />
-                </div>
-                <div className="col-span-1 text-right text-sm text-neutral-500">{weights[i]}</div>
-              </div>
-            ))}
+        {/* Canvas Templates (Divisions) */}
+        <Panel title="Canvas Templates (Divisions)" open={divisionsOpen} setOpen={setDivisionsOpen}>
+          <div className="grid grid-cols-2 gap-2">
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templatePerPale();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, weights: cfg.weights, orientation: "vertical" });
+            }}>Per Pale</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templatePerFess();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, weights: cfg.weights, orientation: "horizontal" });
+            }}>Per Fess</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templateTricolorVertical();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, weights: cfg.weights, orientation: "vertical" });
+            }}>Tricolor (Vert.)</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templateTricolorHorizontal();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, weights: cfg.weights, orientation: "horizontal" });
+            }}>Tricolor (Horiz.)</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templateQuartered();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" });
+            }}>Quartered</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templatePerBend();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays });
+            }}>Per Bend</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templatePerBendSinister();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays });
+            }}>Per Bend Sinister</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templatePerSaltire();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays });
+            }}>Per Saltire</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templatePerChevron();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays });
+            }}>Per Chevron</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templateCenteredCross();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays });
+            }}>Centered Cross</button>
+
+            <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
+              const cfg = templateNordicCross();
+              setDesign({ setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays });
+            }}>Nordic Cross</button>
           </div>
-        </div>
-
-        <div className="rounded-xl border bg-white p-4 shadow-sm">
-          <div className="text-lg font-semibold mb-3">Overlays</div>
-          <div className="grid grid-cols-4 gap-2">
-            <button onClick={addPreset("rectangle")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Rect</button>
-            <button onClick={addPreset("circle")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Circle</button>
-            <button onClick={addPreset("star")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Star</button>
-            <button onClick={addPreset("custom")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Custom</button>
-          </div>
-
-          <div className="grid grid-cols-12 gap-2 items-end mt-3">
-            <div className="col-span-8">
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-sm">Symbol library</label>
-                <span className="text-xs text-neutral-500">{symbolsStatus}</span>
-              </div>
-              <select className="w-full border rounded h-9 px-2" value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}>
-                <option value="" disabled>Choose a symbol…</option>
-                {Array.from(new Set(ALL_SYMBOLS.map(s => s.category))).map((cat) => (
-                  <optgroup key={cat} label={cat}>
-                    {ALL_SYMBOLS.filter(s => s.category === cat).map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
-            </div>
-            <div className="col-span-4">
-              <button disabled={!selectedSymbol} onClick={() => addSymbolOverlay(selectedSymbol)} className="w-full rounded border px-3 py-2 hover:bg-neutral-50 disabled:opacity-50">Add symbol</button>
-            </div>
-          </div>
-
-          <div className="flex justify-end mt-2">
-            <button onClick={loadSymbolsJson} className="rounded border px-3 py-1.5 hover:bg-neutral-50">Reload symbols.json</button>
-          </div>
-
-          <div className="mt-3">
-            <label className="block text-xs mb-1">Import custom symbols (JSON array of {"{id,name,category,path}"})</label>
-            <textarea className="w-full border rounded p-2 font-mono h-28" value={customSymbolsJson} onChange={(e) => setCustomSymbolsJson(e.target.value)} placeholder='[
-  {"id":"eagle_outline","name":"Eagle (outline)","category":"Animals","path":"M ... Z"}
-]'></textarea>
-            <div className="flex justify-end mt-2">
-              <button onClick={importCustomSymbols} className="rounded border px-3 py-1.5 hover:bg-neutral-50">Import</button>
-            </div>
-          </div>
-
-          <div className="mt-3 space-y-2">
-            {overlays.length === 0 && <p className="text-sm text-neutral-500">No overlays yet. Click a button above to add one.</p>}
-            {overlays.map((o) => (
-              <div key={o.id} className={`flex items-center justify-between rounded-lg border p-2 ${selectedId === o.id ? "ring-2 ring-blue-500" : ""}`}>
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-sm" style={{ background: o.fill }} />
-                  <button className="text-sm underline-offset-2 hover:underline" onClick={() => setSelectedId(o.id)}>
-                    {(o.type === "symbol" && o.symbolId) ? `symbol:${o.symbolId}` : o.type} @ {Math.round(o.x)}%,{Math.round(o.y)}%
-                  </button>
-                </div>
-                <div className="flex gap-1">
-                  <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => updateOverlay(o.id, { locked: !o.locked })} title={o.locked ? "Unlock" : "Lock"}>{o.locked ? "🔒" : "🔓"}</button>
-                  <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => bringForward(o.id)} title="Bring forward">⬆︎</button>
-                  <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => sendBackward(o.id)} title="Send backward">⬇︎</button>
-                  <button className="px-2 py-1 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50" onClick={() => removeOverlay(o.id)} title="Delete">🗑</button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {SelectedControls()}
-        </div>
+          <p className="text-xs text-neutral-500 mt-2">
+            Division templates give you common layouts. Colors are just starters—tweak stripes/overlays as you like.
+          </p>
+        </Panel>
 
         {/* Templates */}
-        <div className="rounded-xl border bg-white p-4 shadow-sm">
-          <div className="text-lg font-semibold mb-3">Templates</div>
+        <Panel title="Templates" open={templatesOpen} setOpen={setTemplatesOpen}>
           <div className="grid grid-cols-2 gap-2">
             <button
               className="rounded border px-3 py-2 hover:bg-neutral-50"
@@ -917,10 +1116,94 @@ export default function FlagMaker() {
           <p className="text-xs text-neutral-500 mt-2">
             These are editable approximations built from rectangles/stars so you can tweak and export easily.
           </p>
-        </div>
+        </Panel>
 
-        <div className="rounded-xl border bg-white p-4 shadow-sm">
-          <div className="text-lg font-semibold mb-3">Export</div>
+        <Panel title="Sections" open={sectionsOpen} setOpen={setSectionsOpen}>
+          <div className="space-y-3">
+            {Array.from({ length: sections }).map((_, i) => (
+              <div key={i} className="grid grid-cols-12 gap-3 items-center">
+                <div className="col-span-3">
+                  <label className="block text-xs mb-1">Color {i + 1}</label>
+                  <input type="color" className="h-9 w-full" value={colors[i]} onChange={(e) => { pushHistory(); setColors((c) => c.map((x, idx) => (idx === i ? e.target.value : x))); }} />
+                </div>
+                <div className="col-span-8">
+                  <label className="block text-xs mb-1">Weight</label>
+                  <input type="range" min={1} max={20} step={1} value={weights[i]} onChange={(e) => { pushHistory(); setWeights((w) => w.map((x, idx) => (idx === i ? Number(e.target.value) : x))); }} className="w-full" />
+                </div>
+                <div className="col-span-1 text-right text-sm text-neutral-500">{weights[i]}</div>
+              </div>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel title="Overlays" open={overlaysOpen} setOpen={setOverlaysOpen}>
+          <div className="grid grid-cols-4 gap-2">
+            <button onClick={addPreset("rectangle")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Rect</button>
+            <button onClick={addPreset("circle")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Circle</button>
+            <button onClick={addPreset("star")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Star</button>
+            <button onClick={addPreset("custom")} className="rounded border px-3 py-2 hover:bg-neutral-50">+ Custom</button>
+          </div>
+
+          <div className="grid grid-cols-12 gap-2 items-end mt-3">
+            <div className="col-span-8">
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-sm">Symbol library</label>
+                <span className="text-xs text-neutral-500">{symbolsStatus}</span>
+              </div>
+              <select className="w-full border rounded h-9 px-2" value={selectedSymbol} onChange={(e) => setSelectedSymbol(e.target.value)}>
+                <option value="" disabled>Choose a symbol…</option>
+                {Array.from(new Set(ALL_SYMBOLS.map(s => s.category))).map((cat) => (
+                  <optgroup key={cat} label={cat}>
+                    {ALL_SYMBOLS.filter(s => s.category === cat).map((s) => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
+            <div className="col-span-4">
+              <button disabled={!selectedSymbol} onClick={() => addSymbolOverlay(selectedSymbol)} className="w-full rounded border px-3 py-2 hover:bg-neutral-50 disabled:opacity-50">Add symbol</button>
+            </div>
+          </div>
+
+          <div className="flex justify-end mt-2">
+            <button onClick={loadSymbolsJson} className="rounded border px-3 py-1.5 hover:bg-neutral-50">Reload symbols.json</button>
+          </div>
+
+          <div className="mt-3">
+            <label className="block text-xs mb-1">Import custom symbols (JSON array of {"{id,name,category,path}"})</label>
+            <textarea className="w-full border rounded p-2 font-mono h-28" value={customSymbolsJson} onChange={(e) => setCustomSymbolsJson(e.target.value)} placeholder='[
+  {"id":"eagle_outline","name":"Eagle (outline)","category":"Animals","path":"M ... Z"}
+]'></textarea>
+            <div className="flex justify-end mt-2">
+              <button onClick={importCustomSymbols} className="rounded border px-3 py-1.5 hover:bg-neutral-50">Import</button>
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {overlays.length === 0 && <p className="text-sm text-neutral-500">No overlays yet. Click a button above to add one.</p>}
+            {overlays.map((o) => (
+              <div key={o.id} className={`flex items-center justify-between rounded-lg border p-2 ${selectedId === o.id ? "ring-2 ring-blue-500" : ""}`}>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-sm" style={{ background: o.fill }} />
+                  <button className="text-sm underline-offset-2 hover:underline" onClick={() => setSelectedId(o.id)}>
+                    {(o.type === "symbol" && o.symbolId) ? `symbol:${o.symbolId}` : o.type} @ {Math.round(o.x)}%,{Math.round(o.y)}%
+                  </button>
+                </div>
+                <div className="flex gap-1">
+                  <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => updateOverlay(o.id, { locked: !o.locked })} title={o.locked ? "Unlock" : "Lock"}>{o.locked ? "🔒" : "🔓"}</button>
+                  <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => bringForward(o.id)} title="Bring forward">⬆︎</button>
+                  <button className="px-2 py-1 text-sm rounded border hover:bg-neutral-50" onClick={() => sendBackward(o.id)} title="Send backward">⬇︎</button>
+                  <button className="px-2 py-1 text-sm rounded border border-red-300 text-red-600 hover:bg-red-50" onClick={() => removeOverlay(o.id)} title="Delete">🗑</button>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {SelectedControls()}
+        </Panel>
+
+        <Panel title="Export" open={exportOpen} setOpen={setExportOpen}>
           <div className="flex gap-2">
             <button className="rounded border px-3 py-2 hover:bg-neutral-50" onClick={() => {
               const svg = svgRef.current;
@@ -938,7 +1221,7 @@ export default function FlagMaker() {
               a.click();
             }}>Download PNG</button>
           </div>
-        </div>
+        </Panel>
       </div>
 
       {/* Right Panel: Canvas */}
