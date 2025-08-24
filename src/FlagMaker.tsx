@@ -33,10 +33,9 @@ type SymbolDef = {
   category: string;
   path?: string;
   generator?: "star5";
-  svg?: string;        // <— add
-  viewBox?: string;    // <— add
+  svg?: string;
+  viewBox?: string;
 };
-
 
 const BUILTIN_SYMBOLS: SymbolDef[] = [
   { id: "star5", name: "Star (5‑point)", category: "Stars", generator: "star5" },
@@ -100,6 +99,300 @@ function svgToPng(svgEl: SVGSVGElement, scale = 1) {
   });
 }
 
+/* ============================
+   Templates: helpers + recipes
+   ============================ */
+
+function setDesign(
+  set: {
+    setOrientation: any,
+    setRatio: any,
+    setSections: any,
+    setWeights: any,
+    setColors: any,
+    setOverlays: any,
+    setSelectedId: any,
+    pushHistory: any
+  },
+  cfg: {
+    orientation?: Orientation,
+    ratio?: [number, number],
+    sections: number,
+    colors: string[],
+    weights?: number[],
+    overlays?: Overlay[],
+  }
+) {
+  const {
+    setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory
+  } = set;
+  pushHistory();
+  if (cfg.orientation) setOrientation(cfg.orientation);
+  if (cfg.ratio) setRatio(cfg.ratio);
+  setSections(cfg.sections);
+  setColors(cfg.colors);
+  setWeights(cfg.weights ?? Array.from({ length: cfg.sections }, () => 1));
+  setOverlays(cfg.overlays ?? []);
+  setSelectedId(null);
+}
+
+function rectOverlay({ xPct, yPct, wPct, hPct, fill, stroke = "#0000", strokeWidth = 0, rotation = 0, opacity = 1 }: {
+  xPct: number, yPct: number, wPct: number, hPct: number,
+  fill: string, stroke?: string, strokeWidth?: number, rotation?: number, opacity?: number
+}): Overlay {
+  return {
+    id: uid(),
+    type: "rectangle",
+    x: xPct, y: yPct, w: wPct, h: hPct,
+    rotation, fill, stroke, strokeWidth, opacity,
+  };
+}
+
+function starOverlay({ xPct, yPct, sizePct, fill, stroke = "#0000", strokeWidth = 0, opacity = 1 }: {
+  xPct: number, yPct: number, sizePct: number,
+  fill: string, stroke?: string, strokeWidth?: number, opacity?: number
+}): Overlay {
+  return {
+    id: uid(),
+    type: "star",
+    x: xPct, y: yPct, w: sizePct, h: sizePct,
+    rotation: 0, fill, stroke, strokeWidth, opacity,
+  };
+}
+
+// Make a rotated "band" (rectangle) between two points (in % of width/height).
+// `thicknessPct` is % of flag HEIGHT. Rotation is computed with the true 2:3 ratio.
+function makeBandSegment(
+  x1Pct: number, y1Pct: number,
+  x2Pct: number, y2Pct: number,
+  thicknessPct: number,
+  fill: string,
+  ratio: [number, number]
+): Overlay {
+  const [h, w] = ratio;               // e.g. [2,3]
+  const hw = h / w;                   // H/W
+  const dx = x2Pct - x1Pct;           // % of width
+  const dy = y2Pct - y1Pct;           // % of height
+  const lengthPct = Math.sqrt(dx*dx + (dy*hw)*(dy*hw)); // length as % of width
+  const angle = Math.atan2(dy * hw, dx) * 180 / Math.PI;
+  return {
+    id: uid(),
+    type: "rectangle",
+    x: (x1Pct + x2Pct) / 2,
+    y: (y1Pct + y2Pct) / 2,
+    w: lengthPct,
+    h: thicknessPct,
+    rotation: angle,
+    fill,
+    stroke: "#0000",
+    strokeWidth: 0,
+    opacity: 1,
+  };
+}
+
+/* ----- USA (13 stripes; canton; starfield) ----- */
+function templateUS(viewW: number, viewH: number) {
+  const RED = "#B22234"; const WHITE = "#FFFFFF"; const BLUE = "#3C3B6E";
+
+  // 13 stripes (red first)
+  const sections = 13;
+  const colors = Array.from({ length: sections }, (_, i) => (i % 2 === 0 ? RED : WHITE));
+
+  // Canton: height = 7/13 of flag; width = 0.76 * flag height
+  const cantonHeightFrac = 7 / 13;
+  const cantonWidthFrac  = 0.76 * (viewH / viewW);
+  const cantonW = Math.min(100, cantonWidthFrac * 100);
+  const cantonH = cantonHeightFrac * 100;
+  const canton = rectOverlay({ xPct: cantonW / 2, yPct: cantonH / 2, wPct: cantonW, hPct: cantonH, fill: BLUE });
+
+  // 50 stars: 9 rows (6,5,6,5,6,5,6,5,6)
+  const rows = 9; const cols6 = 6; const cols5 = 5;
+  const marginX = 6; const marginY = 6; // canton-relative %
+  const xStart6 = marginX, xEnd6 = 100 - marginX;
+  const xStart5 = marginX + ((xEnd6 - xStart6) / (2 * cols6));
+  const xEnd5   = 100 - marginX - ((xEnd6 - xStart6) / (2 * cols6));
+  const yTop = marginY, yBot = 100 - marginY;
+  const starSize = Math.min(cantonW, cantonH) * 0.06;
+
+  const stars: Overlay[] = [];
+  for (let r = 0; r < rows; r++) {
+    const use6 = r % 2 === 0;
+    const cols = use6 ? cols6 : cols5;
+    const xStart = use6 ? xStart6 : xStart5;
+    const xEnd   = use6 ? xEnd6   : xEnd5;
+    for (let c = 0; c < cols; c++) {
+      const t = cols === 1 ? 0.5 : c / (cols - 1);
+      const cx = xStart + t * (xEnd - xStart);  // canton %
+      const cy = yTop + (r / (rows - 1)) * (yBot - yTop); // canton %
+      stars.push(starOverlay({
+        xPct: (cx / 100) * cantonW, // convert canton% -> flag%
+        yPct: (cy / 100) * cantonH,
+        sizePct: starSize,
+        fill: WHITE
+      }));
+    }
+  }
+  // Stars are already at (0,0) corner; canton is top-left, so no extra offset needed
+
+  return { ratio: [10, 19] as [number, number], sections, colors, overlays: [canton, ...stars] };
+}
+
+/* ----- Iceland (Nordic cross; approximate bar widths) ----- */
+function templateIceland() {
+  const BLUE = "#003897"; const WHITE = "#FFFFFF"; const RED = "#D72828";
+  const ratio: [number, number] = [18, 25];
+  const sections = 1; const colors = [BLUE];
+
+  // Rough bar thicknesses (% of flag height)
+  const whiteT = 10;
+  const redT   = 6;
+
+  // Offsets (Nordic cross sits left/up)
+  const vCenter = 28; // %
+  const hCenter = 39; // %
+
+  const whiteV = rectOverlay({ xPct: vCenter, yPct: 50, wPct: whiteT, hPct: 100, fill: WHITE });
+  const whiteH = rectOverlay({ xPct: 50, yPct: hCenter, wPct: 100, hPct: whiteT, fill: WHITE });
+  const redV   = rectOverlay({ xPct: vCenter, yPct: 50, wPct: redT,   hPct: 100, fill: RED });
+  const redH   = rectOverlay({ xPct: 50, yPct: hCenter, wPct: 100, hPct: redT,   fill: RED });
+
+  return { ratio, sections, colors, overlays: [whiteV, whiteH, redV, redH] };
+}
+
+/* ----- Uruguay (9 stripes; sun in canton) ----- */
+function templateUruguay() {
+  const WHITE = "#FFFFFF"; const BLUE = "#0038A8";
+  const ratio: [number, number] = [2, 3];
+  const sections = 9;
+  const colors = Array.from({ length: sections }, (_, i) => (i % 2 === 0 ? WHITE : BLUE));
+
+  const cantonH = (5/9)*100; const cantonW = cantonH; // ~square, 5 stripes tall
+  const canton = rectOverlay({ xPct: cantonW/2, yPct: cantonH/2, wPct: cantonW, hPct: cantonH, fill: WHITE });
+
+  const sun: Overlay = {
+    id: uid(), type: "symbol", symbolId: "sun_12",
+    x: cantonW*0.5, y: cantonH*0.5, w: cantonW*0.55, h: cantonH*0.55,
+    rotation: 0, fill: "#FCD116", stroke: "#8C6C00", strokeWidth: 6, opacity: 1
+  };
+
+  return { ratio, sections, colors, overlays: [canton, sun] };
+}
+
+/* ----- DR Congo (diagonal band + star) ----- */
+function templateDRC() {
+  const BLUE = "#00A3DD"; const RED = "#D21034"; const YELLOW = "#F7D618";
+  const ratio: [number, number] = [3,4];
+  const sections = 1; const colors = [BLUE];
+
+  const yellow = rectOverlay({ xPct: 50, yPct: 50, wPct: 150, hPct: 26, fill: YELLOW, rotation: -35 });
+  const red    = rectOverlay({ xPct: 50, yPct: 50, wPct: 150, hPct: 20, fill: RED,    rotation: -35 });
+  const star   = starOverlay({ xPct: 20, yPct: 20, sizePct: 22, fill: YELLOW });
+
+  return { ratio, sections, colors, overlays: [yellow, red, star] };
+}
+
+/* ----- United Kingdom (Union Flag – simplified) ----- */
+function templateUK() {
+  const BLUE = "#012169"; const WHITE = "#FFFFFF"; const RED = "#C8102E";
+  const ratio: [number, number] = [1,2];
+  const sections = 1; const colors = [BLUE];
+  const overlays: Overlay[] = [];
+
+  // White saltires
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 160, hPct: 18, fill: WHITE, rotation: 45 }));
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 160, hPct: 18, fill: WHITE, rotation: -45 }));
+  // Red saltires
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 160, hPct: 10, fill: RED, rotation: 45 }));
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 160, hPct: 10, fill: RED, rotation: -45 }));
+  // White cross
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 100, hPct: 22, fill: WHITE }));
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 22,  hPct: 100, fill: WHITE }));
+  // Red cross
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 100, hPct: 12, fill: RED }));
+  overlays.push(rectOverlay({ xPct: 50, yPct: 50, wPct: 12,  hPct: 100, fill: RED }));
+
+  return { ratio, sections, colors, overlays };
+}
+
+/* ----- South Africa (approx “Y” layout) ----- */
+/* ----- South Africa (exact geometry) ----- */
+function templateSouthAfrica() {
+  // Official colours (common digital approximations)
+  const GREEN  = "#007A4D";
+  const BLACK  = "#000000";
+  const GOLD   = "#FFB612";
+  const RED    = "#DE3831";
+  const BLUE   = "#002395";
+  const WHITE  = "#FFFFFF";
+
+  const ratio: [number, number] = [2, 3];
+
+  // Background: equal red over blue
+  const sections = 2;
+  const colors   = [RED, BLUE];
+  const weights  = [1, 1];
+
+  // Widths as percentages of flag HEIGHT
+  const tG  = 100 * (1/5);   // green band = 20%
+  const tW  = 100 * (1/15);  // white edge = 6.666…%
+  const tY  = 100 * (1/15);  // gold  edge = 6.666…%
+
+  // To draw edges correctly, we render:
+  // 1) black triangle
+  // 2) WHITE "Y" (thickness = tG + 2*tW) on all three arms
+  // 3) GOLD "Y" only on hoist-side diagonals (thickness = tG + 2*tY)
+  // 4) GREEN "Y" (thickness = tG) on all three arms
+  const tWhiteBand = tG + 2 * tW;
+  const tGoldBand  = tG + 2 * tY;
+
+  // Points (in %): hoist corners → centre → fly centre
+  const TL = { x: 0,   y: 0   };
+  const BL = { x: 0,   y: 100 };
+  const C  = { x: 50,  y: 50  };
+  const FR = { x: 100, y: 50  };
+
+  // 1) Black triangle based on hoist, apex at centre
+  const blackTriangle: Overlay = {
+    id: uid(),
+    type: "custom",
+    x: 50, y: 50, w: 100, h: 100,
+    rotation: 0,
+    fill: BLACK,
+    stroke: "#0000",
+    strokeWidth: 0,
+    opacity: 1,
+    // 100×100 box; works for any ratio because we scale non‑uniformly
+    path: "M 0 0 L 0 100 L 50 50 Z",
+  };
+
+  // WHITE arms (full Y: TL→C, BL→C, C→FR)
+  const whiteTop    = makeBandSegment(TL.x, TL.y, C.x, C.y, tWhiteBand, WHITE, ratio);
+  const whiteBottom = makeBandSegment(BL.x, BL.y, C.x, C.y, tWhiteBand, WHITE, ratio);
+  const whiteRight  = makeBandSegment(C.x,  C.y,  FR.x,FR.y, tWhiteBand, WHITE, ratio);
+
+  // GOLD arms (only hoist-side diagonals)
+  const goldTop     = makeBandSegment(TL.x-5, TL.y, C.x-5, C.y, tGoldBand-5, GOLD,  ratio);
+  const goldBottom  = makeBandSegment(BL.x, BL.y-5, C.x, C.y-5, tGoldBand-5, GOLD,  ratio);
+  
+  // GREEN arms (full Y)
+  const greenTop    = makeBandSegment(TL.x, TL.y, C.x, C.y, tG, GREEN, ratio);
+  const greenBottom = makeBandSegment(BL.x, BL.y, C.x, C.y, tG, GREEN, ratio);
+  const greenRight  = makeBandSegment(C.x,  C.y,  FR.x,FR.y, tG, GREEN, ratio);
+
+  const overlays: Overlay[] = [
+    blackTriangle,
+    whiteTop, whiteBottom, whiteRight,
+    goldTop, goldBottom,
+    greenTop, greenBottom, greenRight,
+  ];
+
+  return { ratio, sections, colors, overlays, weights };
+}
+
+/* ============================
+   Component
+   ============================ */
+
 export default function FlagMaker() {
   const [orientation, setOrientation] = useState<Orientation>("horizontal");
   const [ratio, setRatio] = useState<[number, number]>([2, 3]);
@@ -155,8 +448,8 @@ export default function FlagMaker() {
           name: String(s.name || s.id),
           category: String(s.category || "Imported"),
           path: typeof s.path === "string" ? s.path : undefined,
-          svg: typeof s.svg === "string" ? s.svg : undefined,          // <—
-          viewBox: typeof s.viewBox === "string" ? s.viewBox : undefined, // <—
+          svg: typeof s.svg === "string" ? s.svg : undefined,
+          viewBox: typeof s.viewBox === "string" ? s.viewBox : undefined,
           generator: s.generator === "star5" ? "star5" : undefined,
         }));
       setRemoteSymbols(cleaned);
@@ -551,6 +844,81 @@ export default function FlagMaker() {
           {SelectedControls()}
         </div>
 
+        {/* Templates */}
+        <div className="rounded-xl border bg-white p-4 shadow-sm">
+          <div className="text-lg font-semibold mb-3">Templates</div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              className="rounded border px-3 py-2 hover:bg-neutral-50"
+              onClick={() => {
+                const cfg = templateUS(viewW, viewH);
+                setDesign(
+                  { setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                  { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" }
+                );
+              }}
+            >USA 🇺🇸</button>
+
+            <button
+              className="rounded border px-3 py-2 hover:bg-neutral-50"
+              onClick={() => {
+                const cfg = templateIceland();
+                setDesign(
+                  { setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                  { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" }
+                );
+              }}
+            >Iceland 🇮🇸</button>
+
+            <button
+              className="rounded border px-3 py-2 hover:bg-neutral-50"
+              onClick={() => {
+                const cfg = templateUruguay();
+                setDesign(
+                  { setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                  { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" }
+                );
+              }}
+            >Uruguay 🇺🇾</button>
+
+            <button
+              className="rounded border px-3 py-2 hover:bg-neutral-50"
+              onClick={() => {
+                const cfg = templateDRC();
+                setDesign(
+                  { setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                  { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" }
+                );
+              }}
+            >DR Congo 🇨🇩</button>
+
+            <button
+              className="rounded border px-3 py-2 hover:bg-neutral-50"
+              onClick={() => {
+                const cfg = templateUK();
+                setDesign(
+                  { setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                  { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" }
+                );
+              }}
+            >United Kingdom 🇬🇧</button>
+
+            <button
+              className="rounded border px-3 py-2 hover:bg-neutral-50"
+              onClick={() => {
+                const cfg = templateSouthAfrica();
+                setDesign(
+                  { setOrientation, setRatio, setSections, setWeights, setColors, setOverlays, setSelectedId, pushHistory },
+                  { ratio: cfg.ratio, sections: cfg.sections, colors: cfg.colors, overlays: cfg.overlays, orientation: "horizontal" }
+                );
+              }}
+            >South Africa 🇿🇦</button>
+          </div>
+          <p className="text-xs text-neutral-500 mt-2">
+            These are editable approximations built from rectangles/stars so you can tweak and export easily.
+          </p>
+        </div>
+
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <div className="text-lg font-semibold mb-3">Export</div>
           <div className="flex gap-2">
@@ -644,12 +1012,10 @@ export default function FlagMaker() {
                         const tx = cx - w / 2;
                         const ty = cy - h / 2;
 
-                        // generator star (legacy)
                         if (def.generator === "star5") {
                           return <path d={starPath(cx, cy, Math.min(w,h)/2, Math.min(w,h)/4, 5)} fill={o.fill} stroke={o.stroke} strokeWidth={o.strokeWidth} />;
                         }
 
-                        // FULL SVG emblem (this is your case)
                         if (def.svg && def.viewBox) {
                           const [minX, minY, vbW, vbH] = def.viewBox.split(/\s+/).map(Number);
                           const scaleX = w / vbW;
@@ -657,7 +1023,7 @@ export default function FlagMaker() {
                           return (
                             <g
                               transform={`translate(${tx}, ${ty}) translate(${-minX * scaleX}, ${-minY * scaleY}) scale(${scaleX}, ${scaleY})`}
-                              // uncomment next two lines if you generated a tintable set (currentColor):
+                              // For tintable packs (generated with currentColor), uncomment:
                               // fill={o.fill}
                               // stroke={o.stroke}
                               dangerouslySetInnerHTML={{ __html: def.svg }}
@@ -665,7 +1031,6 @@ export default function FlagMaker() {
                           );
                         }
 
-                        // single-path fallback (100×100 box)
                         if (def.path) {
                           return (
                             <g transform={`translate(${tx}, ${ty})`}>
